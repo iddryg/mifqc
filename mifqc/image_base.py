@@ -66,68 +66,9 @@ class ImageBase:
         return cls.from_dask(darr, channel_names, name=Path(pattern).stem)
 
 
-    # --- Helper to fix axes ordering if needed ---
-    def _canonicalize_axes(
-        arr: ArrayLike, axes: str, want: str = "CYX"
-        ) -> Tuple[ArrayLike, str]:
-        """
-        Reorder `arr` so that its axes become `want` (default "CYX…").
-
-        Parameters
-        ----------
-        arr   : numpy.ndarray | dask.array
-        axes  : str           Current order returned by tifffile.series[0].axes
-        want  : str           Desired leading axes. Remainder keeps incoming order.
-
-        Returns
-        -------
-        arr_reordered, new_axes
-        """
-        # sanity
-        if set(axes) != set(want) | set(axes) - set(want):
-            raise ValueError(f"Unexpected axes string {axes}")
-
-        # Move each letter in `want` to the front in given order
-        order: Sequence[int] = []
-        for ax in want:
-            try:
-                order.append(axes.index(ax))
-            except ValueError:
-                raise ValueError(f"Required axis {ax} not found in {axes}")
-
-        # keep remaining axes in original order
-        order.extend(i for i, ax in enumerate(axes) if ax not in want)
-
-        moved = da.moveaxis(arr, range(len(order)), order) if hasattr(arr, "chunks") \
-                else np.moveaxis(arr, range(len(order)), order)
-        new_axes = "".join(axes[i] for i in order)
-        return moved, new_axes
-    
-
-    # --- Helper to extract tiff metadata ---
-    def _extract_channel_names(tf: TiffFile) -> list[str]:
-        try:
-            ome = from_tiff(tf.filehandle)
-            chs = [c.name or f"ch{i}" for i, c in enumerate(ome.images[0].pixels.channels)]
-            if any(ch is None for ch in chs):
-                raise ValueError
-            return chs
-        except Exception:
-            # fallbacks …
-            ij = tf.imagej_metadata
-            if ij and "Labels" in ij:
-                return ij["Labels"].split("\n")
-            # PageName fallback
-            names = [p.tags.get("PageName", None) and p.tags["PageName"].value
-                    for p in tf.pages]
-            if names and all(names):
-                return names
-        return [f"ch{i}" for i in range(tf.series[0].shape[0])]
-
-
     # ---------- Pixel-wise statistics ----------
     def per_channel_stats(self) -> pd.DataFrame:
-        rows: list[dict] = []
+        rows: List[dict] = []
         for c, ch_name in enumerate(self.channel_names):
             band = self.pixels[c]
             d = basic_stats(band)
@@ -146,3 +87,61 @@ class ImageBase:
         out.parent.mkdir(parents=True, exist_ok=True)
         self.stats_.to_csv(out, index=True)
         print(f"[mif-qc] Wrote {out}")
+
+# --- Helper to fix axes ordering if needed ---
+def _canonicalize_axes(
+    arr, axes: str, want: str = "CYX"
+    ) -> Tuple:
+    """
+    Reorder `arr` so that its axes become `want` (default "CYX…").
+
+    Parameters
+    ----------
+    arr   : numpy.ndarray | dask.array
+    axes  : str           Current order returned by tifffile.series[0].axes
+    want  : str           Desired leading axes. Remainder keeps incoming order.
+
+    Returns
+    -------
+    arr_reordered, new_axes
+    """
+    # sanity
+    if set(axes) != set(want) | set(axes) - set(want):
+        raise ValueError(f"Unexpected axes string {axes}")
+
+    # Move each letter in `want` to the front in given order
+    order: Sequence[int] = []
+    for ax in want:
+        try:
+            order.append(axes.index(ax))
+        except ValueError:
+            raise ValueError(f"Required axis {ax} not found in {axes}")
+
+    # keep remaining axes in original order
+    order.extend(i for i, ax in enumerate(axes) if ax not in want)
+
+    moved = da.moveaxis(arr, range(len(order)), order) if hasattr(arr, "chunks") \
+            else np.moveaxis(arr, range(len(order)), order)
+    new_axes = "".join(axes[i] for i in order)
+    return moved, new_axes
+
+
+# --- Helper to extract tiff metadata ---
+def _extract_channel_names(tf: TiffFile) -> List[str]:
+    try:
+        ome = from_tiff(tf.filehandle)
+        chs = [c.name or f"ch{i}" for i, c in enumerate(ome.images[0].pixels.channels)]
+        if any(ch is None for ch in chs):
+            raise ValueError
+        return chs
+    except Exception:
+        # fallbacks …
+        ij = tf.imagej_metadata
+        if ij and "Labels" in ij:
+            return ij["Labels"].split("\n")
+        # PageName fallback
+        names = [p.tags.get("PageName", None) and p.tags["PageName"].value
+                for p in tf.pages]
+        if names and all(names):
+            return names
+    return [f"ch{i}" for i in range(tf.series[0].shape[0])]
