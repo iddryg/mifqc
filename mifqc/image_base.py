@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from tifffile import TiffFile,imread
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, List, Optional, Union
 import warnings
 import dask.array as da
 import dask_image.imread as dair
@@ -17,22 +17,22 @@ from .qc_metrics import basic_stats, gini_index, moran_i
 class ImageBase:
     """Abstract base for EntireImage and TiledImage."""
     pixels: np.ndarray                             # (C, H, W)
-    channel_names: list[str]                       # length == C
+    channel_names: List[str]                       # length == C
     name: str = "unnamed"
     stats_: pd.DataFrame = field(init=False)
 
     # ---------- Constructors ----------
     @classmethod
-    def from_tiff(cls, path: str | Path, channel_names: list[str] | None = None):
-        arr = imread(path)
-        if arr.ndim == 2:          # single channel TIFF
-            arr = arr[None, ...]
-        if channel_names is None:
-            channel_names = [f"ch{i}" for i in range(arr.shape[0])]
-        return cls(arr, channel_names, name=Path(path).stem)
-    
-    def from_tiff(cls, path: str | Path, axes: str | None = None,
-              channel_names: list[str] | None = None):
+    #def from_tiff(cls, path: Union[str, Path], channel_names: Optional[List[str]] = None):
+    #    arr = imread(path)
+    #    if arr.ndim == 2:          # single channel TIFF
+    #        arr = arr[None, ...]
+    #    if channel_names is None:
+    #        channel_names = [f"ch{i}" for i in range(arr.shape[0])]
+    #    return cls(arr, channel_names, name=Path(path).stem)
+    #
+    def from_tiff(cls, path: Union[str, Path], axes: Optional[str] = None,
+              channel_names: Optional[List[str]] = None):
         with TiffFile(path) as tf:
             ser = tf.series[0]          # handle multi-series separately if needed
             axes_in = ser.axes if axes is None else axes
@@ -46,7 +46,7 @@ class ImageBase:
 
     # ---------- lazy TIFF/Zarr/Dask loading helpers ----------
     @classmethod
-    def from_dask(cls, darr: da.Array, channel_names: list[str] | None = None, name="unnamed"):
+    def from_dask(cls, darr: da.Array, channel_names: Optional[List[str]] = None, name="unnamed"):
         if darr.ndim == 2:
             darr = darr[None, ...]
         if channel_names is None:
@@ -54,13 +54,13 @@ class ImageBase:
         return cls(darr, channel_names, name=name)
 
     @classmethod
-    def from_zarr(cls, url: str, component: str | None = None,
-                  channel_names: list[str] | None = None):
+    def from_zarr(cls, url: str, component: Optional[str] = None,
+                  channel_names: Optional[List[str]] = None):
         darr = da.from_zarr(url, component=component)
         return cls.from_dask(darr, channel_names, name=Path(url).stem)
 
     @classmethod
-    def from_glob(cls, pattern: str, channel_names: list[str] | None = None):
+    def from_glob(cls, pattern: str, channel_names: Optional[List[str]] = None):
         """Load N separate TIFFs (or PNGs) lazily as C×H×W via dask-image."""
         darr = dair.imread(pattern)      # shape = (N, H, W)
         return cls.from_dask(darr, channel_names, name=Path(pattern).stem)
@@ -139,7 +139,7 @@ class ImageBase:
         return self.stats_
 
     # ---------- Export ----------
-    def to_csv(self, out_path: str | Path) -> None:
+    def to_csv(self, out_path: Union[str, Path]) -> None:
         if not hasattr(self, "stats_"):
             self.per_channel_stats()
         out = Path(out_path)

@@ -3,9 +3,10 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import pandas as pd
 from pathlib import Path
+from typing import Union, Optional
 
 def heatmap(df: pd.DataFrame, metric: str, channel: str,
-            outfile: str | Path | None = None, cmap="viridis"):
+            outfile: Optional[Union[str, Path]] = None, cmap="viridis"):
     """
     Draw a per-tile heat-map for a given metric and channel.
 

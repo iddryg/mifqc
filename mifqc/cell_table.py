@@ -2,6 +2,7 @@
 from __future__ import annotations
 import pandas as pd
 from pathlib import Path
+from typing import List, Optional, Union
 from dataclasses import dataclass, field
 from .qc_metrics import gini_index, moran_i
 
@@ -11,7 +12,7 @@ class CellTable:
     name: str = "cells"
 
     # ---------- Column-wise univariate descriptors ----------
-    def per_marker_stats(self, marker_cols: list[str] | None = None) -> pd.DataFrame:
+    def per_marker_stats(self, marker_cols: Optional[List[str]] = None) -> pd.DataFrame:
         marker_cols = marker_cols or [
             c for c in self.df.columns if c not in ("CellID", "X_Centroid", "Y_Centroid")
         ]
@@ -29,7 +30,7 @@ class CellTable:
         return pd.DataFrame(rows).set_index("marker")
 
     # ---------- Spatial autocorrelation at cellular scale ----------
-    def moran_per_marker(self, marker_cols: list[str] | None = None) -> pd.Series:
+    def moran_per_marker(self, marker_cols: Optional[List[str]] = None) -> pd.Series:
         import libpysal
         marker_cols = marker_cols or [
             c for c in self.df.columns if c not in ("CellID", "X_Centroid", "Y_Centroid")
@@ -45,5 +46,5 @@ class CellTable:
         return pd.Series(out, name="Moran_I")
 
     # ---------- Export ----------
-    def to_csv(self, out_path: str | Path):
+    def to_csv(self, out_path: Union[str, Path]):
         self.df.to_csv(out_path, index=False)

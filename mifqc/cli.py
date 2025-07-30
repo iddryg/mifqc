@@ -2,6 +2,7 @@
 from __future__ import annotations
 import typer, sys
 from pathlib import Path
+from typing import Optional
 from .entire_image import EntireImage
 from .tiled_image  import TiledImage
 from .plotting     import heatmap
@@ -12,7 +13,7 @@ app = typer.Typer(add_completion=False)
 def whole(
     src        : str = typer.Argument(..., help="Path / glob / Zarr URL"),
     out        : Path = typer.Option("qc", help="Output folder"),
-    zarr_comp  : str | None = typer.Option(None, "--component", "-c",
+    zarr_comp  : Optional[str] = typer.Option(None, "--component", "-c",
                                            help="Zarr sub-array name"),
 ):
     if src.endswith(".zarr") or "::" in src:

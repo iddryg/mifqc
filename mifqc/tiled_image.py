@@ -4,12 +4,13 @@ import numpy as np
 import pandas as pd
 from itertools import product
 from dataclasses import dataclass, field
+from typing import Optional
 from .entire_image import EntireImage
 
 @dataclass
 class TiledImage(EntireImage):
     tile_size: int = 512
-    stride: int | None = None
+    stride: Optional[int] = None
     _tile_stats: pd.DataFrame = field(init=False)
 
     def _iter_tiles(self):
@@ -21,7 +22,7 @@ class TiledImage(EntireImage):
             yield (y, x), self.pixels[sl]
 
     # ---------- Tile statistics ----------
-    def tile_statistics(self, max_tiles: int | None = None) -> pd.DataFrame:
+    def tile_statistics(self, max_tiles: Optional[int] = None) -> pd.DataFrame:
         rows = []
         for idx, (coord, tarr) in enumerate(self._iter_tiles()):
             if max_tiles and idx >= max_tiles:
