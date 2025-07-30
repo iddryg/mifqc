@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mifqc"
+version = "0.1.0"
+description = "QC metrics for multiplex immunofluorescence images"
+authors = [{name = "Ian Dryg", email = "iddryg@gmail.com"}]
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "tifffile",
+    "dask[array]",
+    "dask-image",
+    "zarr",
+    "typer[all]",
+    "matplotlib",
+    "pysal",          # for Moran's I
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-xdist", "pytest-cov", "hypothesis"]
+metadata = ["ome-types>=0.4"]
+
+[project.scripts]
+mifqc = "mifqc.cli:app"
