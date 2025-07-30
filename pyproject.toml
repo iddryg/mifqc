@@ -8,10 +8,11 @@ version = "0.1.0"
 description = "QC metrics for multiplex immunofluorescence images"
 authors = [{name = "Ian Dryg", email = "iddryg@gmail.com"}]
 license = { file = "LICENSE" }
+# scipy version specified to avoid pysal error (scipy loses inf after this version)
 dependencies = [
     "numpy",
     "pandas",
-    "scipy",
+    scipy = "<1.8.0",
     "tifffile",
     "dask[array]",
     "dask-image",
