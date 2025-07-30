@@ -12,7 +12,7 @@ license = { file = "LICENSE" }
 dependencies = [
     "numpy",
     "pandas",
-    scipy = "<1.8.0",
+    "scipy < 1.8.0",
     "tifffile",
     "dask[array]",
     "dask-image",
