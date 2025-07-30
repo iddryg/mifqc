@@ -89,41 +89,90 @@ class ImageBase:
         print(f"[mif-qc] Wrote {out}")
 
 # --- Helper to fix axes ordering if needed ---
-def _canonicalize_axes(
-    arr, axes: str, want: str = "CYX"
-    ) -> Tuple:
+def _canonicalize_axes(arr, axes: str, want: str = "CYX"):
     """
-    Reorder `arr` so that its axes become `want` (default "CYX…").
-
-    Parameters
-    ----------
-    arr   : numpy.ndarray | dask.array
-    axes  : str           Current order returned by tifffile.series[0].axes
-    want  : str           Desired leading axes. Remainder keeps incoming order.
-
-    Returns
-    -------
-    arr_reordered, new_axes
+    Canonicalize axes by reordering array dimensions.
+    Enhanced to handle Z->C conversion for multiplexed data.
     """
-    # sanity
-    if set(axes) != set(want) | set(axes) - set(want):
-        raise ValueError(f"Unexpected axes string {axes}")
+    
+    # Detect and convert Z->C for multiplexed data
+    if _should_convert_z_to_c(axes, arr):
+        original_axes = axes
+        axes = _convert_z_to_c_axes(axes)
+        warnings.warn(f"[MIFQC] Detected multiplexed data: converting {original_axes} -> {axes} "
+                     f"({arr.shape[0]} Z slices treated as channels)")
+    
+    # Validation with error messages
+    axes_set = set(axes)
+    want_set = set(want)
+    
+    if axes_set != want_set:
+        missing_axes = want_set - axes_set
+        extra_axes = axes_set - want_set
+        error_msg = f"Unexpected axes string '{axes}'. Expected '{want}'"
+        
+        if missing_axes:
+            error_msg += f". Missing axes: {missing_axes}"
+        if extra_axes:
+            error_msg += f". Extra axes: {extra_axes}"
+            
+        raise ValueError(error_msg)
 
     # Move each letter in `want` to the front in given order
     order: Sequence[int] = []
-    for ax in want:
-        try:
-            order.append(axes.index(ax))
-        except ValueError:
-            raise ValueError(f"Required axis {ax} not found in {axes}")
+    for target_axis in want:
+        source_idx = axes.index(target_axis)
+        order.append(source_idx)
+    
+    # Transpose the array
+    arr_reordered = arr.transpose(order)
+    axes_out = "".join(want)
+    
+    return arr_reordered, axes_out
 
-    # keep remaining axes in original order
-    order.extend(i for i, ax in enumerate(axes) if ax not in want)
 
-    moved = da.moveaxis(arr, range(len(order)), order) if hasattr(arr, "chunks") \
-            else np.moveaxis(arr, range(len(order)), order)
-    new_axes = "".join(axes[i] for i in order)
-    return moved, new_axes
+def _should_convert_z_to_c(axes: str, arr) -> bool:
+    """
+    Determine if Z axis should be treated as C axis.
+    
+    This detects multiplexed immunofluorescence data where channels
+    are stored as Z slices instead of separate channels.
+    
+    Args:
+        axes: Current axes string (e.g., "ZYX")
+        arr: The image array
+        
+    Returns:
+        bool: True if Z should be converted to C
+    """
+    # Must have Z axis but no C axis
+    has_z = 'Z' in axes
+    has_c = 'C' in axes
+    
+    if not has_z or has_c:
+        return False
+    
+    # Get the Z dimension size
+    z_axis_idx = axes.index('Z')
+    z_size = arr.shape[z_axis_idx]
+    
+    # Convert if we have multiple Z slices that could be channels
+    # Typical range for multiplexed immunofluorescence: 2-50 channels
+    return 0 < z_size <= 500
+
+
+def _convert_z_to_c_axes(axes: str) -> str:
+    """
+    Convert Z axis to C axis in the axes string.
+    
+    Args:
+        axes: Original axes string (e.g., "ZYX")
+        
+    Returns:
+        str: Modified axes string (e.g., "CYX")
+    """
+    return axes.replace('Z', 'C')
+
 
 
 # --- Helper to extract tiff metadata ---
