@@ -23,25 +23,20 @@ class ImageBase:
 
     # ---------- Constructors ----------
     @classmethod
-    #def from_tiff(cls, path: Union[str, Path], channel_names: Optional[List[str]] = None):
-    #    arr = imread(path)
-    #    if arr.ndim == 2:          # single channel TIFF
-    #        arr = arr[None, ...]
-    #    if channel_names is None:
-    #        channel_names = [f"ch{i}" for i in range(arr.shape[0])]
-    #    return cls(arr, channel_names, name=Path(path).stem)
-    #
     def from_tiff(cls, path: Union[str, Path], axes: Optional[str] = None,
               channel_names: Optional[List[str]] = None):
         with TiffFile(path) as tf:
             ser = tf.series[0]          # handle multi-series separately if needed
             axes_in = ser.axes if axes is None else axes
             arr = ser.asarray()         # honours memory-mapping or zarr if selected
+
+            # Extract channel names INSIDE the context manager
+            if channel_names is None:
+                channel_names = _extract_channel_names(tf)
+
         if axes_in != "CYX":
             arr, axes_out = _canonicalize_axes(arr, axes_in, want="CYX")
             warnings.warn(f"Reordered axes {axes_in} → {axes_out}")
-        if channel_names is None:
-            channel_names = _extract_channel_names(tf)  # see below
         return cls(arr, channel_names, name=Path(path).stem)
 
     # ---------- lazy TIFF/Zarr/Dask loading helpers ----------
