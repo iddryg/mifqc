@@ -1,5 +1,7 @@
 # mifqc/tiled_image.py
 from __future__ import annotations
+import time
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from itertools import product
@@ -22,17 +24,50 @@ class TiledImage(EntireImage):
             yield (y, x), self.pixels[sl]
 
     # ---------- Tile statistics ----------
-    def tile_statistics(self, max_tiles: Optional[int] = None) -> pd.DataFrame:
+    def tile_statistics(self, max_tiles: Optional[int] = None, show_progress: bool = True) -> pd.DataFrame:
+        # progress bar and timing
+        start_time = time.time()
+        # Count total tiles for progress bar
+        tiles_list = list(self._iter_tiles())
+        if max_tiles:
+            tiles_list = tiles_list[:max_tiles]
+        total_tiles = len(tiles_list)
+
+        # Create progress bar iterator
+        if show_progress:
+            tile_iterator = tqdm(
+                enumerate(tiles_list), 
+                total=total_tiles,
+                desc=f"Processing {self.name} tiles",
+                unit="tiles",
+                leave=True
+            )
+        else:
+            tile_iterator = enumerate(tiles_list)
+
         rows = []
-        for idx, (coord, tarr) in enumerate(self._iter_tiles()):
-            if max_tiles and idx >= max_tiles:
-                break
+        for idx, (coord, tarr) in tile_iterator:
             img = EntireImage(tarr, self.channel_names, name=f"{self.name}_tile{idx}")
-            stats = img.per_channel_stats()
+            stats = img.per_channel_stats(show_progress=False)  # Don't show nested progress
             stats["tile_y"], stats["tile_x"] = coord
             stats["tile_id"] = idx
             rows.append(stats)
+            
+            # Update progress bar with current tile info
+            if show_progress and hasattr(tile_iterator, 'set_postfix'):
+                tile_iterator.set_postfix({
+                    'current_tile': f"({coord[0]},{coord[1]})",
+                    'channels': len(self.channel_names)
+                })
+        
         self._tile_stats = pd.concat(rows)
+        
+        # Calculate and display timing
+        elapsed_time = time.time() - start_time
+        if show_progress:
+            print(f"✓ [MIFQC] Processed {total_tiles} tiles in {elapsed_time:.2f}s "
+                f"({elapsed_time/total_tiles:.3f}s per tile)")
+        
         return self._tile_stats
 
     # ---------- Aggregate across tiles ----------

@@ -1,6 +1,8 @@
 # mifqc/image_base.py
 from __future__ import annotations
 from pathlib import Path
+import time
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from tifffile import TiffFile,imread
@@ -10,6 +12,7 @@ import dask.array as da
 import dask_image.imread as dair
 import zarr
 from ome_types import from_tiff
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from .qc_metrics import basic_stats, gini_index, moran_i
 
@@ -62,16 +65,47 @@ class ImageBase:
 
 
     # ---------- Pixel-wise statistics ----------
-    def per_channel_stats(self) -> pd.DataFrame:
+    def per_channel_stats(self, show_progress: bool = True) -> pd.DataFrame:
+        # progress bar and timings 
+        start_time = time.time()
+
+        # Create progress bar for channels
+        if show_progress and len(self.channel_names) > 1:
+            channel_iterator = tqdm(
+                enumerate(self.channel_names),
+                total=len(self.channel_names),
+                desc=f"Analyzing {self.name} channels",
+                unit="channels",
+                leave=True
+            )
+        else:
+            channel_iterator = enumerate(self.channel_names)
+
         rows: List[dict] = []
         for c, ch_name in enumerate(self.channel_names):
             band = self.pixels[c]
+
+            # Update progress bar with current channel info
+            if show_progress and len(self.channel_names) > 1 and hasattr(channel_iterator, 'set_postfix'):
+                channel_iterator.set_postfix({
+                    'current': ch_name,
+                    'shape': f"{band.shape[0]}x{band.shape[1]}"
+                })
+            
+            # Calculate statistics
             d = basic_stats(band)
             d["gini"] = gini_index(band)
             d["moran_I"] = moran_i(band)
             d["channel"] = ch_name
             rows.append(d)
         self.stats_ = pd.DataFrame(rows).set_index("channel")
+
+        # Calculate and display timing
+        elapsed_time = time.time() - start_time
+        if show_progress:
+            print(f"✓ [MIFQC] Analyzed {len(self.channel_names)} channels in {elapsed_time:.2f}s "
+                f"({elapsed_time/len(self.channel_names):.3f}s per channel)")
+
         return self.stats_
 
     # ---------- Export ----------
@@ -171,21 +205,147 @@ def _convert_z_to_c_axes(axes: str) -> str:
 
 
 # --- Helper to extract tiff metadata ---
-def _extract_channel_names(tf: TiffFile) -> List[str]:
+def _extract_channel_names(tf):
+    """
+    Enhanced channel name extraction that handles various OME-TIFF formats
+    including Lunaphore COMET files. Uses multiple fallback strategies.
+    """
+    
+    # Strategy 1: Try OME-XML from ImageDescription tag
     try:
-        ome = from_tiff(tf.filehandle)
-        chs = [c.name or f"ch{i}" for i, c in enumerate(ome.images[0].pixels.channels)]
-        if any(ch is None for ch in chs):
-            raise ValueError
-        return chs
-    except Exception:
-        # fallbacks …
-        ij = tf.imagej_metadata
-        if ij and "Labels" in ij:
-            return ij["Labels"].split("\n")
-        # PageName fallback
-        names = [p.tags.get("PageName", None) and p.tags["PageName"].value
-                for p in tf.pages]
-        if names and all(names):
+        # Get the first page's description which should contain OME-XML
+        first_page = tf.pages[0]
+        if hasattr(first_page, 'description') and first_page.description:
+            ome_xml = first_page.description
+            if ome_xml and '<OME' in ome_xml:
+                # Parse the OME-XML to extract channel names
+                root = ET.fromstring(ome_xml)
+                
+                # Define namespaces that might be used
+                namespaces = {
+                    'ome': 'http://www.openmicroscopy.org/Schemas/OME/2016-06',
+                    'ome2013': 'http://www.openmicroscopy.org/Schemas/OME/2013-06',
+                    'ome2012': 'http://www.openmicroscopy.org/Schemas/OME/2012-06'
+                }
+                
+                # Try different namespace combinations
+                for ns_key, ns_url in namespaces.items():
+                    try:
+                        channels = root.findall(f'{{{ns_url}}}Image/{{{ns_url}}}Pixels/{{{ns_url}}}Channel')
+                        if channels:
+                            names = []
+                            for i, ch in enumerate(channels):
+                                name = ch.get('Name') or ch.get('name') or f"Channel_{i}"
+                                names.append(name)
+                            if names:
+                                return names
+                    except:
+                        continue
+                
+                # Try without namespaces (sometimes XML doesn't have proper namespaces)
+                try:
+                    channels = root.findall('.//Channel')
+                    if channels:
+                        names = []
+                        for i, ch in enumerate(channels):
+                            name = ch.get('Name') or ch.get('name') or f"Channel_{i}"
+                            names.append(name)
+                        if names:
+                            return names
+                except:
+                    pass
+    except Exception as e:
+        warnings.warn(f"Failed to extract from OME-XML: {e}")
+    
+    # Strategy 2: Try Lunaphore-specific channel information
+    try:
+        first_page = tf.pages[0]
+        if hasattr(first_page, 'description') and first_page.description:
+            ome_xml = first_page.description
+            if ome_xml and 'FluorescenceChannel' in ome_xml:
+                # Parse for Lunaphore-specific channel information
+                root = ET.fromstring(ome_xml)
+                # Look for ChannelPriv elements which Lunaphore uses
+                channel_elements = []
+                for elem in root.iter():
+                    if elem.tag.endswith('ChannelPriv'):
+                        channel_elements.append(elem)
+                
+                if channel_elements:
+                    names = []
+                    # Sort by channel ID to maintain order
+                    channel_elements.sort(key=lambda x: x.get('ID', ''))
+                    for elem in channel_elements:
+                        fluor_channel = elem.get('FluorescenceChannel')
+                        if fluor_channel:
+                            names.append(fluor_channel)
+                    if names:
+                        return names
+    except Exception as e:
+        warnings.warn(f"Failed to extract Lunaphore channel info: {e}")
+    
+    # Strategy 3: Try ImageJ metadata
+    try:
+        if tf.imagej_metadata:
+            ij = tf.imagej_metadata
+            if "Labels" in ij:
+                labels = ij["Labels"].split("\n")
+                if labels and all(labels):
+                    return labels
+    except Exception as e:
+        warnings.warn(f"Failed to extract from ImageJ metadata: {e}")
+    
+    # Strategy 4: Try PageName tags (safer approach for TiffFrame vs TiffPage issue)
+    try:
+        names = []
+        for i, page in enumerate(tf.pages):
+            try:
+                # Handle both TiffPage and TiffFrame objects
+                if hasattr(page, 'tags'):
+                    # TiffPage object
+                    if "PageName" in page.tags:
+                        name = page.tags["PageName"].value
+                        if name:
+                            names.append(name)
+                        else:
+                            names.append(f"Channel_{i}")
+                    else:
+                        names.append(f"Channel_{i}")
+                elif hasattr(page, 'keyframe') and hasattr(page.keyframe, 'tags'):
+                    # TiffFrame object - access tags through keyframe
+                    if "PageName" in page.keyframe.tags:
+                        name = page.keyframe.tags["PageName"].value
+                        if name:
+                            names.append(name)
+                        else:
+                            names.append(f"Channel_{i}")
+                    else:
+                        names.append(f"Channel_{i}")
+                else:
+                    names.append(f"Channel_{i}")
+            except Exception as e:
+                warnings.warn(f"Error accessing page {i} tags: {e}")
+                names.append(f"Channel_{i}")
+        
+        if names and any(name != f"Channel_{i}" for i, name in enumerate(names)):
             return names
-    return [f"ch{i}" for i in range(tf.series[0].shape[0])]
+    except Exception as e:
+        warnings.warn(f"Failed to extract from PageName tags: {e}")
+    
+    # Strategy 5: Fallback - generate default channel names based on image dimensions
+    try:
+        # Determine number of channels from image axes
+        axes = tf.series[0].axes
+        if axes.startswith('C'):
+            num_channels = tf.series[0].shape[0]
+        elif 'C' in axes:
+            c_index = axes.index('C')
+            num_channels = tf.series[0].shape[c_index]
+        else:
+            # If no C axis, assume single channel
+            num_channels = 1
+        
+        return [f"Channel_{i}" for i in range(num_channels)]
+    except Exception as e:
+        warnings.warn(f"Failed to determine channel count: {e}")
+        return ["Channel_0"]  # Ultimate fallback

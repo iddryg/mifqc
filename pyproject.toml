@@ -20,6 +20,7 @@ dependencies = [
     "typer[all]",
     "matplotlib",
     "pysal",          # for Moran's I
+    "tqdm>=4.62.0",
 ]
 
 [project.optional-dependencies]
