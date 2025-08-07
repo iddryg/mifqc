@@ -22,7 +22,7 @@ from .cell_table import CellTable
 from .qc_metrics import (
     basic_stats,
     gini_index,
-    moran_i,
+    geary_c,
     tissue_mask,
 )
 
@@ -44,7 +44,7 @@ from .cli import app as cli_app
 #    # Metrics
 #    "basic_stats",
 #    "gini_index",
-#    "moran_i",
+#    "geary_c",
 #    "tissue_mask",
 #    # Visualization
 #    "heatmap",
@@ -131,7 +131,7 @@ def quick_tile_analysis(tiff_path, tile_size=512, channel_names=None, output_dir
     # Generate heatmaps for first channel
     if tiled.channel_names:
         first_channel = tiled.channel_names[0]
-        for metric in ["mean", "std", "moran_I"]:
+        for metric in ["mean", "std", "geary_c"]:
             if metric in tile_stats.columns:
                 heatmap(
                     tile_stats, 
