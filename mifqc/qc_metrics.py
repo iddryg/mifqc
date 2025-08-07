@@ -4,13 +4,14 @@ import numpy as np
 import pandas as pd
 from scipy import ndimage as ndi
 from skimage import filters, morphology
-from esda.moran import Moran
+from esda.geary import Geary
 import libpysal  # for spatial weights
+import warnings
 
 __all__ = [
     "basic_stats",
     "gini_index",
-    "moran_i",
+    "geary_c",
     "tissue_mask",
 ]
 
@@ -35,15 +36,65 @@ def gini_index(arr: np.ndarray) -> float:
     cum = np.cumsum(flat, dtype=float)
     return (n + 1 - 2 * cum.sum() / cum[-1]) / n
 
-# ---------- Moran’s I ----------
-def moran_i(arr: np.ndarray, normalize: bool = True) -> float:
-    """Global Moran’s I for a single 2-D channel."""
-    y = arr.astype(float).ravel()
-    # Build queen-contiguity weights on the image grid
-    rows, cols = arr.shape
-    w = libpysal.weights.lat2W(rows, cols, rook=False)
-    mi = Moran(y, w, two_tailed=False)
-    return mi.I if normalize else mi.I * w.s0  # raw numerator if needed
+# ---------- Geary's C (replaces Moran's I) ----------
+def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 1_000_000) -> float:
+    """
+    Global Geary's C for a single 2-D channel with memory management.
+    
+    Geary's C is less computationally intensive than Moran's I and better
+    suited for large images in quality control workflows.
+    
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input 2D image array
+    downsample_factor : int, default=4
+        Factor by which to downsample the image if it's too large
+    max_pixels : int, default=1_000_000
+        Maximum number of pixels to process without downsampling
+        
+    Returns
+    -------
+    float
+        Geary's C value. Values close to 1 indicate spatial randomness,
+        values < 1 indicate positive spatial autocorrelation (clustering),
+        values > 1 indicate negative spatial autocorrelation (dispersion).
+    """
+    try:
+        # Memory management: downsample large images
+        if arr.size > max_pixels:
+            # Downsample to reduce memory usage
+            from skimage.transform import downscale_local_mean
+            factor = max(1, int(np.sqrt(arr.size / max_pixels)))
+            arr_processed = downscale_local_mean(arr, (factor, factor)).astype(float)
+            warnings.warn(
+                f"Image downsampled by factor {factor} for Geary's C calculation "
+                f"(original: {arr.shape}, processed: {arr_processed.shape})"
+            )
+        else:
+            arr_processed = arr.astype(float)
+        
+        y = arr_processed.ravel()
+        rows, cols = arr_processed.shape
+        
+        # Build queen-contiguity weights on the image grid
+        # This is the same spatial weights as Moran's I but Geary's C is more efficient
+        w = libpysal.weights.lat2W(rows, cols, rook=False)
+        
+        # Calculate Geary's C - this is computationally lighter than Moran's I
+        gc = Geary(y, w, permutations=0)  # Skip permutations to save time
+        
+        return gc.C
+        
+    except MemoryError:
+        warnings.warn(
+            f"MemoryError computing Geary's C for image shape {arr.shape}. "
+            "Returning NaN. Consider using tile-based analysis for large images."
+        )
+        return np.nan
+    except Exception as e:
+        warnings.warn(f"Error computing Geary's C: {e}. Returning NaN.")
+        return np.nan
 
 # ---------- Tissue mask ----------
 def tissue_mask(

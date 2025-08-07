@@ -14,7 +14,7 @@ import zarr
 from ome_types import from_tiff
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from .qc_metrics import basic_stats, gini_index, moran_i
+from .qc_metrics import basic_stats, gini_index, geary_c
 
 @dataclass
 class ImageBase:
@@ -95,7 +95,7 @@ class ImageBase:
             # Calculate statistics
             d = basic_stats(band)
             d["gini"] = gini_index(band)
-            d["moran_I"] = moran_i(band)
+            d["geary_c"] = geary_c(band)
             d["channel"] = ch_name
             rows.append(d)
         self.stats_ = pd.DataFrame(rows).set_index("channel")
@@ -207,8 +207,7 @@ def _convert_z_to_c_axes(axes: str) -> str:
 # --- Helper to extract tiff metadata ---
 def _extract_channel_names(tf):
     """
-    Enhanced channel name extraction that handles various OME-TIFF formats
-    including Lunaphore COMET files. Uses multiple fallback strategies.
+    Enhanced channel name extraction that handles various formats.
     """
     
     # Strategy 1: Try OME-XML from ImageDescription tag
@@ -284,14 +283,25 @@ def _extract_channel_names(tf):
     except Exception as e:
         warnings.warn(f"Failed to extract Lunaphore channel info: {e}")
     
-    # Strategy 3: Try ImageJ metadata
+    # Strategy 3: Handle ImageJ format specifically
     try:
         if tf.imagej_metadata:
             ij = tf.imagej_metadata
-            if "Labels" in ij:
+            
+            # Check for ImageJ Labels
+            if "Labels" in ij and ij["Labels"]:
                 labels = ij["Labels"].split("\n")
                 if labels and all(labels):
-                    return labels
+                    return [label.strip() for label in labels if label.strip()]
+            
+            # For ImageJ format, use the number of slices/images
+            if "slices" in ij and ij["slices"] > 1:
+                num_channels = ij["slices"]
+                return [f"Channel_{i:02d}" for i in range(num_channels)]
+            elif "images" in ij and ij["images"] > 1:
+                num_channels = ij["images"]
+                return [f"Channel_{i:02d}" for i in range(num_channels)]
+                
     except Exception as e:
         warnings.warn(f"Failed to extract from ImageJ metadata: {e}")
     
@@ -332,20 +342,21 @@ def _extract_channel_names(tf):
     except Exception as e:
         warnings.warn(f"Failed to extract from PageName tags: {e}")
     
-    # Strategy 5: Fallback - generate default channel names based on image dimensions
+    # Strategy 5: Infer from axes and shape
     try:
-        # Determine number of channels from image axes
-        axes = tf.series[0].axes
-        if axes.startswith('C'):
-            num_channels = tf.series[0].shape[0]
-        elif 'C' in axes:
-            c_index = axes.index('C')
-            num_channels = tf.series[0].shape[c_index]
-        else:
-            # If no C axis, assume single channel
-            num_channels = 1
+        series = tf.series[0]
+        axes = series.axes
+        shape = series.shape
         
-        return [f"Channel_{i}" for i in range(num_channels)]
+        # If we have ZYX or CYX format, use the first dimension
+        if axes in ['ZYX', 'CYX'] and len(shape) >= 3:
+            num_channels = shape[0]
+            return [f"Channel_{i:02d}" for i in range(num_channels)]
+        elif len(shape) == 2:
+            return ["Channel_00"]  # Single channel 2D image
+            
     except Exception as e:
-        warnings.warn(f"Failed to determine channel count: {e}")
-        return ["Channel_0"]  # Ultimate fallback
+        warnings.warn(f"Failed to determine channel count from axes: {e}")
+    
+    # Fallback
+    return ["Channel_00"]
