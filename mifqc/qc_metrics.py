@@ -67,7 +67,8 @@ def gini_index(arr: np.ndarray) -> float:
     return float(np.clip(result, 0.0, 1.0))
 
 # ---------- Geary's C ----------
-def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 1_000_000) -> float:
+#def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 1_000_000) -> float:
+def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 200_000) -> float:
     """
     Global Geary's C for a single 2-D channel with memory management.
     
