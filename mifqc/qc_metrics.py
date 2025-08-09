@@ -28,15 +28,45 @@ def basic_stats(arr: np.ndarray) -> dict:
 # ---------- Gini index ----------
 def gini_index(arr: np.ndarray) -> float:
     """Gini index of pixel intensities."""
+    
+    if arr.size == 0:
+        return np.nan
+    
     flat = arr.flatten().astype(float)
+    
+    # Remove NaNs
+    valid_mask = ~np.isnan(flat)
+    if np.sum(valid_mask) < 2:
+        return np.nan
+    
+    flat = flat[valid_mask]
+    
+    # Check for all-zero case BEFORE any processing
+    total_sum = np.sum(flat)
+    if total_sum == 0 or np.abs(total_sum) < 1e-15:
+        return 0.0  # Perfect equality
+    
     if np.issubdtype(flat.dtype, np.integer):
         flat = flat + 1e-9  # avoid zeros
+    
     flat.sort()
     n = flat.size
     cum = np.cumsum(flat, dtype=float)
-    return (n + 1 - 2 * cum.sum() / cum[-1]) / n
+    
+    # THE KEY FIX: Check cum[-1] before division
+    if cum[-1] == 0 or np.abs(cum[-1]) < 1e-15:
+        return 0.0
+    
+    # Now safe to divide
+    result = (n + 1 - 2 * cum.sum() / cum[-1]) / n
+    
+    # Ensure valid result
+    if np.isnan(result) or np.isinf(result):
+        return np.nan
+    
+    return float(np.clip(result, 0.0, 1.0))
 
-# ---------- Geary's C (replaces Moran's I) ----------
+# ---------- Geary's C ----------
 def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 1_000_000) -> float:
     """
     Global Geary's C for a single 2-D channel with memory management.
