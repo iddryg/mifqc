@@ -11,7 +11,8 @@ import warnings
 __all__ = [
     "basic_stats",
     "gini_index",
-    "geary_c",
+    # skip geary_c for now
+    #"geary_c",
     "tissue_mask",
 ]
 

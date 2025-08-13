@@ -95,7 +95,8 @@ class ImageBase:
             # Calculate statistics
             d = basic_stats(band)
             d["gini"] = gini_index(band)
-            d["geary_c"] = geary_c(band)
+            # skip geary_c for now
+            #d["geary_c"] = geary_c(band)
             d["channel"] = ch_name
             rows.append(d)
         self.stats_ = pd.DataFrame(rows).set_index("channel")
