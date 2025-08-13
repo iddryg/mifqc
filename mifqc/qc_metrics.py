@@ -92,6 +92,18 @@ def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 200_0
         values > 1 indicate negative spatial autocorrelation (dispersion).
     """
     try:
+        # Checks for edge cases
+        unique_values = np.unique(arr)
+        if len(unique_values) == 1:
+            # All values identical - definite uniform case
+            return np.nan
+        
+        # Check for uniform/nearly uniform data that causes esda issues
+        arr_variance = np.var(arr)
+        if arr_variance < 1e-6:
+            # This is mathematically correct - uniform data has no spatial autocorrelation
+            return np.nan
+
         # Memory management: downsample large images
         if arr.size > max_pixels:
             # Downsample to reduce memory usage
@@ -115,6 +127,9 @@ def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 200_0
         # Calculate Geary's C - this is computationally lighter than Moran's I
         gc = Geary(y, w, permutations=0)  # Skip permutations to save time
         
+        if np.isnan(gc.C) or np.isinf(gc.C):
+            return np.nan
+
         return gc.C
         
     except MemoryError:
