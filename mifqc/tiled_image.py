@@ -4,6 +4,7 @@ import time
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from itertools import product
 from dataclasses import dataclass, field
 from typing import Optional
