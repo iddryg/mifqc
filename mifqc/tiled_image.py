@@ -50,6 +50,7 @@ class TiledImage(EntireImage):
         for idx, (coord, tarr) in tile_iterator:
             img = EntireImage(tarr, self.channel_names, name=f"{self.name}_tile{idx}")
             stats = img.per_channel_stats(show_progress=False)  # Don't show nested progress
+            stats = stats.reset_index() # get channel names as a column
             stats["tile_y"], stats["tile_x"] = coord
             stats["tile_id"] = idx
             rows.append(stats)
@@ -61,7 +62,7 @@ class TiledImage(EntireImage):
                     'channels': len(self.channel_names)
                 })
         
-        self._tile_stats = pd.concat(rows)
+        self._tile_stats = pd.concat(rows, ignore_index=True)
         
         # Calculate and display timing
         elapsed_time = time.time() - start_time
