@@ -74,7 +74,7 @@ class TiledImage(EntireImage):
 
         rows = []
         for idx, (coord, tarr) in tile_iterator:
-            tile_name_id = f"tile_{coord}_{coord[7]}" # Unique identifier for tile files
+            tile_name_id = f"tile_{coord[0]}_{coord[1]}" # Unique identifier for tile files
             img = EntireImage(tarr, self.channel_names, name=f"{self.name}_tile{idx}")
 
             # Calculate scalar statistics
@@ -105,7 +105,7 @@ class TiledImage(EntireImage):
                     plot_histogram(
                         counts, bin_edges,
                         outfile=tile_histogram_output_path / f"{self.name}_{tile_name_id}_{ch_name}_histogram.png",
-                        title=f"Intensity Histogram - {ch_name} (Tile Y:{coord}, X:{coord[7]})"
+                        title=f"Intensity Histogram - {ch_name} (Tile Y:{coord[0]}, X:{coord[1]})"
                     )
 
             # Update progress bar with current tile info
