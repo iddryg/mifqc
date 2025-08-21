@@ -23,6 +23,23 @@ class ImageBase:
     channel_names: List[str]                       # length == C
     name: str = "unnamed"
     stats_: pd.DataFrame = field(init=False)
+    _global_max_intensity: Optional[float] = field(init=False, default=None) # Cached attribute for global max
+
+    # Property to calculate and cache global max intensity
+    @property
+    def global_max_intensity(self) -> float:
+        if self._global_max_intensity is None:
+            if self.pixels.size == 0:
+                self._global_max_intensity = 0.0 # Handle empty image case
+            else:
+                # Check if it's a Dask array or NumPy array
+                if isinstance(self.pixels, da.Array):
+                    # Compute the max for Dask array
+                    self._global_max_intensity = float(self.pixels.max().compute())
+                else:
+                    # Compute the max for NumPy array
+                    self._global_max_intensity = float(self.pixels.max())
+        return self._global_max_intensity
 
     # ---------- Constructors ----------
     @classmethod
@@ -140,6 +157,20 @@ class ImageBase:
         all_histograms = {}
 
         channels_to_process = list(self.channel_names) if channels is None else [ch for ch in channels if ch in self.channel_names]
+
+        # Determine the actual value range for the histograms
+        actual_value_range = value_range
+        if actual_value_range is None:
+            if self.pixels.size == 0:
+                warnings.warn("Image has no pixels; cannot determine histogram range. Using (0,1).")
+                actual_value_range = (0, 1) # Fallback for empty array
+            else:
+                # Use the new global_max_intensity property
+                actual_value_range = (0, self.global_max_intensity)
+                warnings.warn(f"Automatically set histogram range to (0, {actual_value_range[4]:.2f}) "
+                              f"based on global max pixel value for this image/tile.")
+        # reassign value_range after updating
+        value_range = actual_value_range
 
         if show_progress and len(channels_to_process) > 1:
             channel_iterator = tqdm(

@@ -91,7 +91,7 @@ def quick_whole_image_qc(tiff_path, channel_names=None, output_dir="qc"):
 def quick_tile_analysis(tiff_path, tile_size=512, channel_names=None, output_dir="qc",
                         save_histograms: bool = True, 
                         histogram_bins: int = 100, # default to 100 bins
-                        standardized_histogram_range: Tuple[float, float] = (0, 65535)) -> TiledImage: # default to uint16 range
+                        standardized_histogram_range: Optional[Tuple[float, float]] = None) -> TiledImage: # default to uint16 range
     """
     Quick helper for tile-based QC analysis with visualization.
 
@@ -133,6 +133,12 @@ def quick_tile_analysis(tiff_path, tile_size=512, channel_names=None, output_dir
     # Ensure output directory exists for all results
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Provide a warning at this top-level function if the range is automatically determined
+    if standardized_histogram_range is None:
+        # The 'tiled' object itself holds the full image pixels and thus has the global_max_intensity property
+        warnings.warn(f"Automatically setting histogram range to (0, {tiled.global_max_intensity:.2f}) "
+                      f"based on global max pixel value of the entire image.")
 
     # Compute statistics, now passing the histogram parameters and base output directory
     tile_stats = tiled.tile_statistics(

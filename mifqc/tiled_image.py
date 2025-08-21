@@ -112,12 +112,13 @@ class TiledImage(EntireImage):
             rows.append(stats)
 
             # Calculate Histograms per Tile and collect for combined output
-            if save_histograms:
-                # Calculate histograms for all channels in the current tile
+            if save_histograms: # [14]
+                # Pass the user-provided 'standardized_histogram_range' directly.
+                # If it's None, img.per_channel_histograms will use img.global_max_intensity (for the current tile).
                 tile_histograms = img.per_channel_histograms(
-                    channels=self.channel_names, # Process all channels for this tile
+                    channels=self.channel_names,
                     bins=histogram_bins,
-                    value_range=standardized_histogram_range, # Pass new parameter
+                    value_range=standardized_histogram_range, # Pass the parameter received by this method [15]
                     show_progress=False
                 )
 
@@ -170,7 +171,9 @@ class TiledImage(EntireImage):
                     hist_data_list_for_plotting,
                     channel_name=ch_name,
                     outfile=combined_hist_output_dir / f"{self.name}_{ch_name}_combined_tile_histograms.png",
-                    x_range=standardized_histogram_range if standardized_histogram_range else (0, 65535) # Pass range for plotting
+                    # For grid plotting, ensure all plots have the same X-range.
+                    # If user didn't specify, use the global max intensity of the *entire* image (self.global_max_intensity).
+                    x_range=standardized_histogram_range if standardized_histogram_range is not None else (0, self.global_max_intensity)
                 )
 
         # Calculate and display timing
