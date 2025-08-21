@@ -33,7 +33,7 @@ class TiledImage(EntireImage):
                         show_progress: bool = True,
                         save_histograms: bool = True, 
                         histogram_bins: int = 100,
-                        standardized_histogram_range: Optional[Tuple[float, float]] = (0,self.global_max_intensity), # assume uint16
+                        standardized_histogram_range: Optional[Tuple[float, float]] = None, # assume uint16
                         output_base_dir: Optional[Path] = None, # Base directory for all outputs
                         histogram_output_subdir: str = "histograms") -> pd.DataFrame:
         """
@@ -66,6 +66,15 @@ class TiledImage(EntireImage):
 
         # progress bar and timing
         start_time = time.time()
+
+        # Determine the effective histogram range
+        actual_histogram_range = standardized_histogram_range
+        if actual_histogram_range is None:
+            # If no range is provided, use the global max intensity of the entire image
+            actual_histogram_range = (0, self.global_max_intensity)
+            warnings.warn(f"Automatically setting histogram range to (0, {self.global_max_intensity:.2f}) "
+                          f"based on global max pixel value of the entire image.")
+        standardized_histogram_range = actual_histogram_range
 
         # determine base output directory
         if output_base_dir is None:
@@ -112,13 +121,13 @@ class TiledImage(EntireImage):
             rows.append(stats)
 
             # Calculate Histograms per Tile and collect for combined output
-            if save_histograms: # [14]
+            if save_histograms: 
                 # Pass the user-provided 'standardized_histogram_range' directly.
                 # If it's None, img.per_channel_histograms will use img.global_max_intensity (for the current tile).
                 tile_histograms = img.per_channel_histograms(
                     channels=self.channel_names,
                     bins=histogram_bins,
-                    value_range=standardized_histogram_range, # Pass the parameter received by this method [15]
+                    value_range=standardized_histogram_range, # Pass the parameter received by this method
                     show_progress=False
                 )
 
