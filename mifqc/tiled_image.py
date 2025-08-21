@@ -33,7 +33,7 @@ class TiledImage(EntireImage):
                         show_progress: bool = True,
                         save_histograms: bool = True, 
                         histogram_bins: int = 100,
-                        standardized_histogram_range: Optional[Tuple[float, float]] = None, # assume uint16
+                        standardized_histogram_range: Optional[Tuple[float, float]] = (0,self.global_max_intensity), # assume uint16
                         output_base_dir: Optional[Path] = None, # Base directory for all outputs
                         histogram_output_subdir: str = "histograms") -> pd.DataFrame:
         """
