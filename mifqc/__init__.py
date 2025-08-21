@@ -18,6 +18,9 @@ from .entire_image import EntireImage
 from .tiled_image import TiledImage
 from .cell_table import CellTable
 
+# Import other
+from typing import List, Optional, Union, Tuple
+
 # Core metrics functions
 from .qc_metrics import (
     basic_stats,
@@ -85,10 +88,13 @@ def quick_whole_image_qc(tiff_path, channel_names=None, output_dir="qc"):
     
     return img
 
-def quick_tile_analysis(tiff_path, tile_size=512, channel_names=None, output_dir="qc"):
+def quick_tile_analysis(tiff_path, tile_size=512, channel_names=None, output_dir="qc",
+                        save_histograms: bool = True, 
+                        histogram_bins: int = 100, # default to 100 bins
+                        standardized_histogram_range: Tuple[float, float] = (0, 65535)) -> TiledImage: # default to uint16 range
     """
     Quick helper for tile-based QC analysis with visualization.
-    
+
     Parameters
     ----------
     tiff_path : str or Path
@@ -99,47 +105,61 @@ def quick_tile_analysis(tiff_path, tile_size=512, channel_names=None, output_dir
         Names of channels
     output_dir : str or Path
         Directory to save results
-        
+    save_histograms : bool
+        If True, calculates, plots, and saves combined histogram data.
+    histogram_bins : int
+        Number of bins for histograms.
+    standardized_histogram_range : tuple[float, float]
+        The (min, max) range for all histograms. Defaults to (0, 65535) for uint16 images.
+
     Returns
     -------
     TiledImage
         The analyzed tiled image object
     """
     from pathlib import Path
-    
+
     # Load as entire image first
     base_img = EntireImage.from_tiff(tiff_path, channel_names=channel_names)
-    
+
     # Create tiled version
     tiled = TiledImage(
-        base_img.pixels, 
+        base_img.pixels,
         base_img.channel_names,
         name=base_img.name,
         tile_size=tile_size
     )
-    
-    # Compute statistics
-    tile_stats = tiled.tile_statistics()
-    summary_stats = tiled.summarize_tiles()
-    
-    # Save results
+
+    # Ensure output directory exists for all results
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Compute statistics, now passing the histogram parameters and base output directory
+    tile_stats = tiled.tile_statistics(
+        save_histograms=save_histograms,
+        histogram_bins=histogram_bins,
+        standardized_histogram_range=standardized_histogram_range,
+        output_base_dir=out_dir, # Pass the output_dir as the base for all generated files
+        histogram_output_subdir="histograms" # Default sub-folder for histogram outputs
+    )
+    summary_stats = tiled.summarize_tiles()
+
+    # Save results (original functionality)
     tiled.tiles_to_csv(out_dir)
     summary_stats.to_csv(out_dir / f"{tiled.name}_tile_summary.csv")
-    
-    # Generate heatmaps for first channel
+
+    # Generate heatmaps for first channel (original functionality)
     if tiled.channel_names:
-        first_channel = tiled.channel_names[0]
+        first_channel = tiled.channel_names
         for metric in ["mean", "std", "geary_c"]:
             if metric in tile_stats.columns:
                 heatmap(
-                    tile_stats, 
-                    metric=metric, 
+                    tile_stats,
+                    metric=metric,
                     channel=first_channel,
                     outfile=out_dir / f"{tiled.name}_{first_channel}_{metric}_heatmap.png"
                 )
-    
+
     return tiled
 
 # Package info for CLI and debugging

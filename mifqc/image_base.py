@@ -110,14 +110,20 @@ class ImageBase:
         return self.stats_
 
 
-    def per_channel_histograms(self, bins: int = 256, show_progress: bool = True) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    def per_channel_histograms(self, channels: Optional[Sequence[str]] = None, bins: int = 100, value_range: Tuple[float, float] = (0,65535), show_progress: bool = True) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """
         Calculates pixel intensity histograms for each channel of the image.
 
         Parameters
         ----------
+        channels : Sequence[str], optional
+            List of channel names to calculate histograms for. If None, all channels are processed.
         bins : int
             Number of bins for the histogram.
+        value_range : tuple[float, float]
+            The (min, max) range for the histogram bins. If None, the range is
+            determined by the min and max values of the array.
+            Default is for uint16, 0 to 65535.
         show_progress : bool
             Whether to show a progress bar.
 
@@ -129,28 +135,31 @@ class ImageBase:
         start_time = time.time()
         all_histograms = {}
 
-        if show_progress and len(self.channel_names) > 1:
+        channels_to_process = list(self.channel_names) if channels is None else [ch for ch in channels if ch in self.channel_names]
+
+        if show_progress and len(channels_to_process) > 1:
             channel_iterator = tqdm(
-                enumerate(self.channel_names),
-                total=len(self.channel_names),
+                channels_to_process,
+                total=len(channels_to_process),
                 desc=f"Calculating histograms for {self.name} channels",
                 unit="channels",
                 leave=True
             )
         else:
-            channel_iterator = enumerate(self.channel_names)
+            channel_iterator = channels_to_process
 
-        for c, ch_name in channel_iterator:
+        for ch_name in channel_iterator:
+            c = self.channel_names.index(ch_name) # Get the index for the current channel name
             band = self.pixels[c]
-            counts, bin_edges = calculate_histogram(band, bins=bins) # Call the new qc_metrics function
+            counts, bin_edges = calculate_histogram(band, bins=bins, value_range=value_range) # Pass value_range
             all_histograms[ch_name] = (counts, bin_edges)
 
-            if show_progress and len(self.channel_names) > 1 and hasattr(channel_iterator, 'set_postfix'):
+            if show_progress and hasattr(channel_iterator, 'set_postfix'):
                 channel_iterator.set_postfix({'current': ch_name})
 
         elapsed_time = time.time() - start_time
         if show_progress:
-            print(f"✓ [MIFQC] Calculated histograms for {len(self.channel_names)} channels in {elapsed_time:.2f}s")
+            print(f"✓ [MIFQC] Calculated histograms for {len(channels_to_process)} channels in {elapsed_time:.2f}s")
         return all_histograms
 
 

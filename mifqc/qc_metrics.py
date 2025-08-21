@@ -6,6 +6,7 @@ from scipy import ndimage as ndi
 from skimage import filters, morphology
 from esda.geary import Geary
 import libpysal  # for spatial weights
+from typing import Optional, Tuple
 import warnings
 
 __all__ = [
@@ -168,7 +169,7 @@ def tissue_mask(
     return mask.astype(bool)
 
 
-def calculate_histogram(arr: np.ndarray, bins: int = 256) -> tuple[np.ndarray, np.ndarray]:
+def calculate_histogram(arr: np.ndarray, bins: int = 256, value_range: Tuple[float, float] = (0,65535)) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculates the histogram of pixel intensities for a 2-D array.
 
@@ -178,6 +179,9 @@ def calculate_histogram(arr: np.ndarray, bins: int = 256) -> tuple[np.ndarray, n
         Input 2D image array (single channel).
     bins : int
         Number of bins for the histogram.
+    value_range : tuple[float, float], optional
+        The (min, max) range for the histogram bins. If None, the range is
+        determined by the min and max values of the array.
 
     Returns
     -------
@@ -188,5 +192,13 @@ def calculate_histogram(arr: np.ndarray, bins: int = 256) -> tuple[np.ndarray, n
     """
     if arr.size == 0:
         return np.array([]), np.array([])
-    counts, bin_edges = np.histogram(arr.flatten(), bins=bins)
+    
+    # Ensure array is flatten and valid
+    flat_arr = arr.flatten()
+    # Filter out NaN values if any, for robust histogram calculation
+    valid_pixels = flat_arr[~np.isnan(flat_arr)]
+    if valid_pixels.size == 0:
+        return np.array([]), np.array([])
+
+    counts, bin_edges = np.histogram(valid_pixels, bins=bins, range=value_range)
     return counts, bin_edges
