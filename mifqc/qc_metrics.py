@@ -169,7 +169,7 @@ def tissue_mask(
     return mask.astype(bool)
 
 
-def calculate_histogram(arr: np.ndarray, bins: int = 256, value_range: Tuple[float, float] = (0,65535)) -> tuple[np.ndarray, np.ndarray]:
+def calculate_histogram(arr: np.ndarray, bins: int = 100, value_range: Optional[Tuple[float, float]] = None) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculates the histogram of pixel intensities for a 2-D array.
 

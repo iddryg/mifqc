@@ -110,7 +110,11 @@ class ImageBase:
         return self.stats_
 
 
-    def per_channel_histograms(self, channels: Optional[Sequence[str]] = None, bins: int = 100, value_range: Tuple[float, float] = (0,65535), show_progress: bool = True) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    def per_channel_histograms(self, 
+                               channels: Optional[Sequence[str]] = None, 
+                               bins: int = 100, 
+                               value_range: Optional[Tuple[float, float]] = None, 
+                               show_progress: bool = True) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """
         Calculates pixel intensity histograms for each channel of the image.
 
