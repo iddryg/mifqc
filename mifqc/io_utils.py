@@ -39,25 +39,25 @@ def save_histogram_data(counts: np.ndarray, bin_edges: np.ndarray, out_path: Uni
     #print(f"[mif-qc] Wrote histogram data to {out_path}")
 
 
-    def save_combined_histogram_data(all_histogram_records: List[Dict], out_path: Union[str, Path]):
-        """
-        Saves combined histogram data for multiple tiles/channels to a single CSV file.
+def save_combined_histogram_data(all_histogram_records: List[Dict], out_path: Union[str, Path]):
+    """
+    Saves combined histogram data for multiple tiles/channels to a single CSV file.
 
-        Parameters
-        ----------
-        all_histogram_records : List[Dict]
-            A list of dictionaries, where each dictionary represents one bin's data
-            from a specific tile and channel, containing keys:
-            'tile_y', 'tile_x', 'tile_id', 'channel', 'bin_start', 'bin_end', 'pixel_count'.
-        out_path : str or Path
-            Path to save the combined CSV file.
-        """
-        if not all_histogram_records:
-            warnings.warn("No combined histogram data to save.")
-            return
+    Parameters
+    ----------
+    all_histogram_records : List[Dict]
+        A list of dictionaries, where each dictionary represents one bin's data
+        from a specific tile and channel, containing keys:
+        'tile_y', 'tile_x', 'tile_id', 'channel', 'bin_start', 'bin_end', 'pixel_count'.
+    out_path : str or Path
+        Path to save the combined CSV file.
+    """
+    if not all_histogram_records:
+        warnings.warn("No combined histogram data to save.")
+        return
 
-        df = pd.DataFrame(all_histogram_records)
-        out_path = Path(out_path)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(out_path, index=False)
-        print(f"[mif-qc] Wrote combined histogram data to {out_path}")
+    df = pd.DataFrame(all_histogram_records)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, index=False)
+    print(f"[mif-qc] Wrote combined histogram data to {out_path}")
