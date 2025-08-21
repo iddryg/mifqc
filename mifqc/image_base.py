@@ -167,7 +167,7 @@ class ImageBase:
             else:
                 # Use the new global_max_intensity property
                 actual_value_range = (0, self.global_max_intensity)
-                warnings.warn(f"Automatically set histogram range to (0, {actual_value_range[4]:.2f}) "
+                warnings.warn(f"Automatically set histogram range to (0, {actual_value_range[1]:.2f}) "
                               f"based on global max pixel value for this image/tile.")
         # reassign value_range after updating
         value_range = actual_value_range
