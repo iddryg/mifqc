@@ -14,7 +14,7 @@ import zarr
 from ome_types import from_tiff
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from .qc_metrics import basic_stats, gini_index, geary_c
+from .qc_metrics import basic_stats, gini_index, geary_c, calculate_histogram
 
 @dataclass
 class ImageBase:
@@ -108,6 +108,51 @@ class ImageBase:
                 f"({elapsed_time/len(self.channel_names):.3f}s per channel)")
 
         return self.stats_
+
+
+    def per_channel_histograms(self, bins: int = 256, show_progress: bool = True) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """
+        Calculates pixel intensity histograms for each channel of the image.
+
+        Parameters
+        ----------
+        bins : int
+            Number of bins for the histogram.
+        show_progress : bool
+            Whether to show a progress bar.
+
+        Returns
+        -------
+        dict[str, tuple[np.ndarray, np.ndarray]]
+            A dictionary where keys are channel names and values are (counts, bin_edges) tuples.
+        """
+        start_time = time.time()
+        all_histograms = {}
+
+        if show_progress and len(self.channel_names) > 1:
+            channel_iterator = tqdm(
+                enumerate(self.channel_names),
+                total=len(self.channel_names),
+                desc=f"Calculating histograms for {self.name} channels",
+                unit="channels",
+                leave=True
+            )
+        else:
+            channel_iterator = enumerate(self.channel_names)
+
+        for c, ch_name in channel_iterator:
+            band = self.pixels[c]
+            counts, bin_edges = calculate_histogram(band, bins=bins) # Call the new qc_metrics function
+            all_histograms[ch_name] = (counts, bin_edges)
+
+            if show_progress and len(self.channel_names) > 1 and hasattr(channel_iterator, 'set_postfix'):
+                channel_iterator.set_postfix({'current': ch_name})
+
+        elapsed_time = time.time() - start_time
+        if show_progress:
+            print(f"✓ [MIFQC] Calculated histograms for {len(self.channel_names)} channels in {elapsed_time:.2f}s")
+        return all_histograms
+
 
     # ---------- Export ----------
     def to_csv(self, out_path: Union[str, Path]) -> None:

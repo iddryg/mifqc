@@ -9,6 +9,8 @@ from itertools import product
 from dataclasses import dataclass, field
 from typing import Optional
 from .entire_image import EntireImage
+from .plotting import heatmap, plot_histogram
+from .io_utils import write_report, save_histogram_data
 
 @dataclass
 class TiledImage(EntireImage):
@@ -25,7 +27,31 @@ class TiledImage(EntireImage):
             yield (y, x), self.pixels[sl]
 
     # ---------- Tile statistics ----------
-    def tile_statistics(self, max_tiles: Optional[int] = None, show_progress: bool = True) -> pd.DataFrame:
+    def tile_statistics(self, 
+                        max_tiles: Optional[int] = None, 
+                        show_progress: bool = True,
+                        save_histograms: bool = True, 
+                        histogram_bins: int = 256,
+                        histogram_output_subdir: str = "histograms") -> pd.DataFrame:
+        """
+        Computes per-tile statistics and optionally generates/saves histograms.
+
+        Parameters
+        ----------
+        
+        save_histograms : bool
+            If True, calculates, plots, and saves histogram data for each channel in each tile.
+        histogram_bins : int
+            Number of bins to use for histograms if `save_histograms` is True.
+        histogram_output_subdir : str
+            Subdirectory within the output directory to save histogram plots and data.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with per-tile statistics.
+        """
+
         # progress bar and timing
         start_time = time.time()
         # Count total tiles for progress bar
@@ -48,13 +74,40 @@ class TiledImage(EntireImage):
 
         rows = []
         for idx, (coord, tarr) in tile_iterator:
+            tile_name_id = f"tile_{coord}_{coord[7]}" # Unique identifier for tile files
             img = EntireImage(tarr, self.channel_names, name=f"{self.name}_tile{idx}")
+
+            # Calculate scalar statistics
             stats = img.per_channel_stats(show_progress=False)  # Don't show nested progress
             stats = stats.reset_index() # get channel names as a column
             stats["tile_y"], stats["tile_x"] = coord
             stats["tile_id"] = idx
             rows.append(stats)
             
+            # Calculate, Save, and Plot Histograms per Tile
+            if save_histograms:
+                # Create a specific output directory for this tile's histograms
+                # Using Path(self.name).parent here assumes self.name is a path, which it might not be.
+                # A more robust way would be to pass the base output directory from the caller.
+                # For this example, let's assume `qc` is the top-level output and create sub-folders.
+                base_output_dir = Path("qc") # Placeholder for the root QC output directory
+                tile_histogram_output_path = base_output_dir / self.name / tile_name_id / histogram_output_subdir
+                tile_histogram_output_path.mkdir(parents=True, exist_ok=True)
+
+                tile_histograms = img.per_channel_histograms(bins=histogram_bins, show_progress=False)
+                for ch_name, (counts, bin_edges) in tile_histograms.items():
+                    # Save histogram data
+                    save_histogram_data(
+                        counts, bin_edges,
+                        tile_histogram_output_path / f"{self.name}_{tile_name_id}_{ch_name}_histogram_data.csv"
+                    )
+                    # Plot and save histogram
+                    plot_histogram(
+                        counts, bin_edges,
+                        outfile=tile_histogram_output_path / f"{self.name}_{tile_name_id}_{ch_name}_histogram.png",
+                        title=f"Intensity Histogram - {ch_name} (Tile Y:{coord}, X:{coord[7]})"
+                    )
+
             # Update progress bar with current tile info
             if show_progress and hasattr(tile_iterator, 'set_postfix'):
                 tile_iterator.set_postfix({

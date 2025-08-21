@@ -1,6 +1,7 @@
 # mifqc/plotting.py
 from __future__ import annotations
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Union, Optional
@@ -27,3 +28,38 @@ def heatmap(df: pd.DataFrame, metric: str, channel: str,
         Path(outfile).parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(outfile, dpi=300, bbox_inches="tight")
     return plt.gca()
+
+
+def plot_histogram(counts: np.ndarray, bin_edges: np.ndarray,
+                   outfile: Optional[Union[str, Path]] = None,
+                   title: str = "Pixel Intensity Histogram"):
+    """
+    Draws a histogram of pixel intensities.
+
+    Parameters
+    ----------
+    counts : np.ndarray
+        The counts of pixels in each bin.
+    bin_edges : np.ndarray
+        The edges of the histogram bins.
+    outfile : str or Path, optional
+        Path to save the histogram plot. If None, displays the plot.
+    title : str
+        Title for the plot.
+    """
+    plt.figure(figsize=(8, 5))
+    # Using plt.bar to represent the histogram, with width derived from bin_edges
+    plt.bar(bin_edges[:-1], counts, width=np.diff(bin_edges), edgecolor="black", alpha=0.7)
+    plt.title(title)
+    plt.xlabel("Pixel Intensity")
+    plt.ylabel("Number of Pixels")
+    plt.grid(axis='y', alpha=0.75)
+    plt.tight_layout()
+
+    if outfile:
+        Path(outfile).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(outfile, dpi=300, bbox_inches="tight")
+        plt.close() # Close the plot to free memory
+    else:
+        plt.show()
+    return plt.gca() # Returns the current axes, similar to other plotting functions

@@ -166,3 +166,27 @@ def tissue_mask(
     mask = morphology.remove_small_objects(mask, min_size=min_size)
     mask = morphology.remove_small_holes(mask, area_threshold=min_size)
     return mask.astype(bool)
+
+
+def calculate_histogram(arr: np.ndarray, bins: int = 256) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Calculates the histogram of pixel intensities for a 2-D array.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input 2D image array (single channel).
+    bins : int
+        Number of bins for the histogram.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        A tuple containing:
+        - counts: The number of pixels in each bin.
+        - bin_edges: The edges of the bins.
+    """
+    if arr.size == 0:
+        return np.array([]), np.array([])
+    counts, bin_edges = np.histogram(arr.flatten(), bins=bins)
+    return counts, bin_edges
