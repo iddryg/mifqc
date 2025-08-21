@@ -128,7 +128,7 @@ def plot_tile_histograms_grid(
         # Use plt.bar to represent the histogram
         ax.bar(bin_edges[:-1], counts, width=np.diff(bin_edges), edgecolor="black", alpha=0.7, align='edge')
         ax.set_title(f"Tile Y:{tile_y}, X:{tile_x}", fontsize=8)
-        ax.set_xlim(x_range, x_range[1]) # Standardize x-axis range
+        ax.set_xlim(x_range[0], x_range[1]) # Standardize x-axis range
 
         # Only label outermost axes to avoid clutter
         if row_idx == n_rows - 1: # Last row
