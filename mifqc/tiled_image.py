@@ -70,6 +70,7 @@ class TiledImage(EntireImage):
         # determine base output directory
         if output_base_dir is None:
             output_base_dir = Path("qc") # Default if not provided
+        output_base_dir = Path(output_base_dir)
         output_base_dir.mkdir(parents=True, exist_ok=True)
 
         # Count total tiles for progress bar
