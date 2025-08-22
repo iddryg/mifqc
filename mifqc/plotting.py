@@ -111,7 +111,7 @@ def plot_tile_histograms_grid(
         return None
 
     # Adjust figure size dynamically based on number of subplots
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.5, n_rows * 3), squeeze=False) # squeeze=False ensures axes is always 2D
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.5, n_rows * 3), squeeze=False, facecolor='white') # squeeze=False ensures axes is always 2D
     fig.suptitle(f"{title_prefix} {channel_name}", fontsize=16)
 
     # Plot each histogram
