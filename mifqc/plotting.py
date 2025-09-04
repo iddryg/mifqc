@@ -15,7 +15,7 @@ def heatmap(df: pd.DataFrame, metric: str, channel: str,
     Parameters
     ----------
     df        : DataFrame returned by `TiledImage.tile_statistics()`
-    metric    : column to visualise (e.g. "mean", "geary_c")
+    metric    : column to visualise (e.g. "mean")
     channel   : channel name present in df["channel"]
     """
     sub = df[df["channel"] == channel]

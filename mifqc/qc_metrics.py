@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from scipy import ndimage as ndi
 from skimage import filters, morphology
-from esda.geary import Geary
 import libpysal  # for spatial weights
 from typing import Optional, Tuple
 import warnings
@@ -12,8 +11,6 @@ import warnings
 __all__ = [
     "basic_stats",
     "gini_index",
-    # skip geary_c for now
-    #"geary_c",
     "tissue_mask",
 ]
 
@@ -93,6 +90,9 @@ def geary_c(arr: np.ndarray, downsample_factor: int = 4, max_pixels: int = 200_0
         values < 1 indicate positive spatial autocorrelation (clustering),
         values > 1 indicate negative spatial autocorrelation (dispersion).
     """
+
+    from esda.geary import Geary
+
     try:
         # Checks for edge cases
         unique_values = np.unique(arr)

@@ -14,7 +14,7 @@ import zarr
 from ome_types import from_tiff
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from .qc_metrics import basic_stats, gini_index, geary_c, calculate_histogram
+from .qc_metrics import basic_stats, gini_index, calculate_histogram
 
 @dataclass
 class ImageBase:
@@ -112,8 +112,6 @@ class ImageBase:
             # Calculate statistics
             d = basic_stats(band)
             d["gini"] = gini_index(band)
-            # skip geary_c for now
-            #d["geary_c"] = geary_c(band)
             d["channel"] = ch_name
             rows.append(d)
         self.stats_ = pd.DataFrame(rows).set_index("channel")
